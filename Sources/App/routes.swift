@@ -174,6 +174,85 @@ public func routes(_ router: Router) throws {
                 }
         }
     }
+
+    // FIXED using `SQLQueryFetcher+Aliases.swift´
+    router.get("swifql/fixed/get-todos-2") { req -> EventLoopFuture<[Todo]> in
+        return req.withNewConnection(to: .mysql) { connection -> EventLoopFuture<[Todo]> in
+
+            let todo = Todo.as("t1")
+
+            let query = SwifQL
+                .select(todo.*)
+                .from(todo.table)
+
+            return query
+                .execute(on: connection)
+                .all(decoding: Todo.self, entity: "t1")
+        }
+    }
+
+    // FIXED using `SQLQueryFetcher+Aliases.swift´
+    router.get("swifql/fixed/get-todos-3") { req -> EventLoopFuture<[Todo]> in
+        return req.withNewConnection(to: .mysql) { connection -> EventLoopFuture<[Todo]> in
+
+            let todo1 = Todo.as("t1")
+            let todo2 = Todo.as("t2")
+
+            let query = SwifQL
+                .select(todo1.*, todo2.*)
+                .from(todo1.table)
+                .join(.left, todo2.table, on: todo1~\.id == todo2~\.id)
+
+            return query
+                .execute(on: connection)
+                .all(decoding: Todo.self, entity: "t1", Todo.self, entity: "t2")
+                .map { todos in
+                    return todos.map { $0.0 }
+                }
+        }
+    }
+
+    // FIXED using `SQLQueryFetcher+Aliases.swift´
+    router.get("swifql/fixed/get-todos-4") { req -> EventLoopFuture<[TodosResponse]> in
+        return req.withNewConnection(to: .mysql) { connection -> EventLoopFuture<[TodosResponse]> in
+
+            let todo1 = Todo.as("t1")
+            let todo2 = Todo.as("t2")
+
+            let query = SwifQL
+                .select(todo1.*, todo2.*)
+                .from(todo1.table)
+                .join(.left, todo2.table, on: todo1~\.id != todo2~\.id)
+
+            return query
+                .execute(on: connection)
+                .all(decoding: Todo.self, entity: "t1", Todo.self, entity: "t2")
+                .map { result in
+                    return result.map { (todo1, todo2) in TodosResponse(todo1: todo1, todo2: todo2) }
+                }
+        }
+    }
+
+    // FIXED using `SQLQueryFetcher+Aliases.swift´
+    router.get("swifql/fixed/get-todos-5") { req -> EventLoopFuture<[TodoUserResponse]> in
+        return req.withNewConnection(to: .mysql) { connection -> EventLoopFuture<[TodoUserResponse]> in
+
+            let todo = Todo.as("t")
+            let user = User.as("u")
+
+            let query = SwifQL
+                .select(todo.*, user.*)
+                .from(todo.table)
+                .join(.left, user.table, on: todo~\.id != user~\.id)
+
+            return query
+                .execute(on: connection)
+                .all(decoding: Todo.self, entity: "t", User.self, entity: "u")
+                .map { result in
+                    return result.map { (todo, user) in TodoUserResponse(todo: todo, user: user) }
+                }
+        }
+    }
 }
 
 struct TodosResponse: Content {
@@ -185,12 +264,3 @@ struct TodoUserResponse: Content {
     let todo: Todo
     let user: User
 }
-
-//
-//final class Todo1: TodoBase, SQLTable {
-//    static var sqlTableIdentifierString: String = "t1"
-//}
-//
-//final class Todo2: TodoBase, SQLTable {
-//    static var sqlTableIdentifierString: String = "t2"
-//}

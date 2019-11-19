@@ -39,11 +39,11 @@ public func routes(_ router: Router) throws {
         }
     }
 
-    // DOESN'T WORK
+    // DOESN'T WORK; FIXED by https://github.com/vapor/mysql-kit/pull/244
     router.get("swifql/get-todos-2") { req -> EventLoopFuture<[Todo]> in
         return req.withNewConnection(to: .mysql) { connection -> EventLoopFuture<[Todo]> in
 
-            let todo = Todo.as("t")
+            let todo = Todo.as("t1")
 
             let query = SwifQL
                 .select(todo.*)
@@ -74,7 +74,7 @@ public func routes(_ router: Router) throws {
         }
     }
 
-    // DOESN'T WORK
+    // DOESN'T WORK; FIXED by https://github.com/vapor/mysql-kit/pull/244
     router.get("swifql/get-todos-3") { req -> EventLoopFuture<[Todo]> in
         return req.withNewConnection(to: .mysql) { connection -> EventLoopFuture<[Todo]> in
 
@@ -104,4 +104,49 @@ public func routes(_ router: Router) throws {
                 }
         }
     }
+
+    // DOESN'T WORK
+    router.get("swifql/get-todos-4") { req -> EventLoopFuture<[TodoResponse]> in
+        return req.withNewConnection(to: .mysql) { connection -> EventLoopFuture<[TodoResponse]> in
+
+            let todo1 = Todo.as("t1")
+            let todo2 = Todo.as("t2")
+
+            let query = SwifQL
+                .select(todo1.*, todo2.*)
+                .from(todo1.table)
+                .join(.left, todo2.table, on: todo1~\.id != todo2~\.id)
+
+            /* Produces fine SQL query:
+
+             SELECT t1.* , t2.*
+             FROM Todo AS t1
+             LEFT JOIN Todo AS t2
+                ON t1.id != t2.id
+
+             */
+
+            return query
+                .execute(on: connection)
+                .all(decoding: Todo.self, Todo.self)
+                .map { todos in
+                    // return only first todo to make it build
+                    return todos.map { (todo1, todo2) in TodoResponse(todo1: todo1, todo2: todo2) }
+                }
+        }
+    }
 }
+
+struct TodoResponse: Content {
+    let todo1: Todo
+    let todo2: Todo
+}
+
+//
+//final class Todo1: TodoBase, SQLTable {
+//    static var sqlTableIdentifierString: String = "t1"
+//}
+//
+//final class Todo2: TodoBase, SQLTable {
+//    static var sqlTableIdentifierString: String = "t2"
+//}

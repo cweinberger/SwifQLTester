@@ -253,6 +253,94 @@ public func routes(_ router: Router) throws {
                 }
         }
     }
+
+    // FIXED using `SQLQueryFetcher+Aliases.swift´
+    router.get("swifql/fixed/get-todos-6") { req -> EventLoopFuture<[TodoTodoUserResponse]> in
+        return req.withNewConnection(to: .mysql) { connection -> EventLoopFuture<[TodoTodoUserResponse]> in
+
+            let todo1 = Todo.as("t1")
+            let todo2 = Todo.as("t2")
+            let user = User.as("u")
+
+            let query = SwifQL
+                .select(user.*, todo1.*, todo2.*)
+                .from(user.table)
+                .join(.left, todo1.table, on: todo1~\.id == 1)
+                .join(.left, todo2.table, on: todo2~\.id == 2)
+
+            return query
+                .execute(on: connection)
+                .all(
+                    decoding: User.self, entity: "u",
+                    Todo.self, entity: "t1",
+                    Todo.self, entity: "t2")
+                .map { result in
+                    return result.map { (user, todo1, todo2) in TodoTodoUserResponse(todo1: todo1, todo2: todo2, user: user) }
+                }
+        }
+    }
+
+    // ISSUE WITH MYSQL ROWS (using subquery)
+    router.get("swifql/fixed/get-todos-7") { req -> EventLoopFuture<[TodoUserResponse]> in
+        return req.withNewConnection(to: .mysql) { connection -> EventLoopFuture<[TodoUserResponse]> in
+
+            let todo1 = Todo.as("t1")
+            let joinedTodo1 = Todo.as("joinedTodo1")
+            let user = User.as("u")
+
+            let query = SwifQL
+                .select(user.*, todo1.*)
+                .from(user.table)
+                .join(.left, todo1.table, on: todo1~\.id == |(
+                    SwifQL
+                        .select(joinedTodo1~\.id)
+                        .from(joinedTodo1.table)
+                        .where(joinedTodo1~\.id == 1)
+                        .orderBy(.desc(joinedTodo1~\.title))
+                        .limit("0,1")
+                    )|
+                )
+
+            return query
+                .execute(on: connection)
+                .all(decoding: User.self, Todo.self)
+                .map { result in
+                    return result.map { (user, todo) in TodoUserResponse(todo: todo, user: user) }
+            }
+        }
+    }
+
+    // ISSUE WITH MYSQL ROWS (using subquery, no aliases)
+    router.get("swifql/fixed/get-todos-8") { req -> EventLoopFuture<[TodoUserResponse]> in
+        return req.withNewConnection(to: .mysql) { connection -> EventLoopFuture<[TodoUserResponse]> in
+
+            let query = SwifQL
+                .select(User.table.*, Todo.table.*)
+                .from(User.table)
+                .join(.left, Todo.table, on: \Todo.id == |(
+                    SwifQL
+                        .select(\Todo.id)
+                        .from(Todo.table)
+                        .where(\Todo.id == 1)
+                        .orderBy(.desc(\Todo.title))
+                        .limit("0,1")
+                    )|
+                )
+
+            /* Produces
+
+             SELECT User.* , Todo.* FROM User LEFT JOIN Todo ON Todo.id = (SELECT Todo.id FROM Todo WHERE Todo.id = 1 ORDER BY Todo.title DESC LIMIT 1)
+
+             */
+
+            return query
+                .execute(on: connection)
+                .all(decoding: User.self, Todo.self)
+                .map { result in
+                    return result.map { (user, todo) in TodoUserResponse(todo: todo, user: user) }
+            }
+        }
+    }
 }
 
 struct TodosResponse: Content {
@@ -262,5 +350,11 @@ struct TodosResponse: Content {
 
 struct TodoUserResponse: Content {
     let todo: Todo
+    let user: User
+}
+
+struct TodoTodoUserResponse: Content {
+    let todo1: Todo
+    let todo2: Todo
     let user: User
 }

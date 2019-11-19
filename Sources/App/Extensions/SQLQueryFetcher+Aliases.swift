@@ -2,6 +2,10 @@ import SQL
 
 extension SQLQueryFetcher {
 
+    /// Collects all decoded output into an array and returns it.
+    ///
+    ///     builder.all(decoding: Planet.self, entity: "pl")
+    ///
     public func all<A>(
         decoding type: A.Type, entity: String
     ) -> Future<[A]>
@@ -11,6 +15,10 @@ extension SQLQueryFetcher {
         return run(decoding: A.self, entity: entity) { all.append($0) }.map { all }
     }
 
+    /// Decodes two types from the result set. Collects all decoded output into an array and returns it.
+    ///
+    ///     builder.all(decoding: Planet.self, entity: "pl", Galaxy.self, entity: "gal")
+    ///
     public func all<A, B>(
         decoding a: A.Type, entity entityA: String,
         _ b: B.Type, entity entityB: String
@@ -21,6 +29,10 @@ extension SQLQueryFetcher {
         return run(decoding: A.self, entity: entityA, B.self, entity: entityB) { all.append(($0, $1)) }.map { all }
     }
 
+    /// Decodes three types from the result set. Collects all decoded output into an array and returns it.
+    ///
+    ///     builder.all(decoding: Planet.self, entity: "pl", Galaxy.self, entity: "gal", SolarSystem.self, entity: "solar")
+    ///
     public func all<A, B, C>(
         decoding a: A.Type, entity entityA: String,
         _ b: B.Type, entity entityB: String,
@@ -32,6 +44,10 @@ extension SQLQueryFetcher {
         return run(decoding: A.self, entity: entityA, B.self, entity: entityB, C.self, entity: entityC) { all.append(($0, $1, $2)) }.map { all }
     }
 
+    /// Decodes four types from the result set. Collects all decoded output into an array and returns it.
+    ///
+    ///     builder.all(decoding: Planet.self, entity: "pl1", Planet.self, entity: "pl2", Galaxy.self, entity: "gal", SolarSystem.self, entity: "solar")
+    ///
     public func all<A, B, C, D>(
         decoding a: A.Type, entity entityA: String,
         _ b: B.Type, entity entityB: String,
@@ -49,6 +65,13 @@ extension SQLQueryFetcher {
         ) { all.append(($0, $1, $2, $3)) }.map { all }
     }
 
+    /// Runs the query, passing decoded output to the supplied closure as it is recieved.
+    ///
+    ///     builder.run(decoding: Planet.self, entity: "pl") { planet in
+    ///         // ..
+    ///     }
+    ///
+    /// The returned future will signal completion of the query.
     public func run<A>(
         decoding type: A.Type,
         entity: String,
@@ -64,6 +87,13 @@ extension SQLQueryFetcher {
         }
     }
 
+    /// Runs the query, passing decoded output to the supplied closure as it is recieved.
+    ///
+    ///     builder.run(decoding: Planet.self, entity: "pl", Galaxy.self, entity: "gal") { planet, galaxy in
+    ///         // ..
+    ///     }
+    ///
+    /// The returned future will signal completion of the query.
     public func run<A, B>(
         decoding a: A.Type, entity entityA: String,
         _ b: B.Type, entity entityB: String,
@@ -80,6 +110,13 @@ extension SQLQueryFetcher {
         }
     }
 
+    /// Runs the query, passing decoded output to the supplied closure as it is recieved.
+    ///
+    ///     builder.run(decoding: Planet.self, entity: "pl", Galaxy.self, entity: "gal", SolarSystem.self, entity: "solar") { planet, galaxy, solarSystem in
+    ///         // ..
+    ///     }
+    ///
+    /// The returned future will signal completion of the query.
     public func run<A, B, C>(
         decoding a: A.Type, entity entityA: String,
         _ b: B.Type, entity entityB: String,
@@ -98,6 +135,13 @@ extension SQLQueryFetcher {
         }
     }
 
+    /// Runs the query, passing decoded output to the supplied closure as it is recieved.
+    ///
+    ///     builder.run(decoding: Planet.self, entity: "pl1", Planet.self, entity: "pl2", Galaxy.self, entity: "gal", SolarSystem.self, entity: "solar") { planet1, planet2, galaxy, solarSystem in
+    ///         // ..
+    ///     }
+    ///
+    /// The returned future will signal completion of the query.
     public func run<A, B, C, D>(
         decoding a: A.Type, entity entityA: String,
         _ b: B.Type, entity entityB: String,

@@ -35,6 +35,30 @@ public func routes(_ router: Router) throws {
         }
     }
 
+    router.get("debug/psql/add-testdata") { req -> EventLoopFuture<Response> in
+        return req.withNewConnection(to: .psql) { connection in
+            let todos = [
+                PTodo(id: 1, title: "first todo"),
+                PTodo(id: 2, title: "second todo"),
+                PTodo(id: 3, title: "third todo")
+            ]
+
+            let user = [
+                PUser(id: 500, name: "User 500"),
+                PUser(id: 600, name: "User 600"),
+                PUser(id: 700, name: "User 700")
+            ]
+
+            return todos.map { $0.create(orUpdate: true, on: connection) }
+                .flatten(on: req)
+                .flatMap { _ in
+                    user.map { $0.create(orUpdate: true, on: connection) }
+                        .flatten(on: req)
+                }
+                .transform(to: Response(http: HTTPResponse(status: .created), using: req))
+        }
+    }
+
     // WORKS!
     router.get("swifql/get-todos-1") { req -> EventLoopFuture<[Todo]> in
         return req.withNewConnection(to: .mysql) { connection -> EventLoopFuture<[Todo]> in
@@ -341,6 +365,70 @@ public func routes(_ router: Router) throws {
             }
         }
     }
+
+    // WORKS with PostgreSQL (using subquery)
+    router.get("swifql/psql/get-todos-7") { req -> EventLoopFuture<[PTodoUserResponse]> in
+        return req.withNewConnection(to: .psql) { connection -> EventLoopFuture<[PTodoUserResponse]> in
+
+            let todo1 = PTodo.as("t1")
+            let joinedTodo1 = PTodo.as("joinedTodo1")
+            let user = PUser.as("u")
+
+            let query = SwifQL
+                .select(user.*, todo1.*)
+                .from(user.table)
+                .join(.left, todo1.table, on: todo1~\.id == |(
+                    SwifQL
+                        .select(joinedTodo1~\.id)
+                        .from(joinedTodo1.table)
+                        .where(joinedTodo1~\.id == 1)
+                        .orderBy(.desc(joinedTodo1~\.title))
+                        .offset(0)
+                        .limit(1)
+                    )|
+                )
+
+            return query
+                .execute(on: connection)
+                .all(decoding: PUser.self, PTodo.self)
+                .map { result in
+                    return result.map { (user, todo) in PTodoUserResponse(todo: todo, user: user) }
+            }
+        }
+    }
+
+    // WORKS with PostgreSQL (using subquery, no aliases)
+    router.get("swifql/psql/get-todos-8") { req -> EventLoopFuture<[PTodoUserResponse]> in
+        return req.withNewConnection(to: .psql) { connection -> EventLoopFuture<[PTodoUserResponse]> in
+
+            let query = SwifQL
+                .select(PUser.table.*, PTodo.table.*)
+                .from(PUser.table)
+                .join(.left, PTodo.table, on: \PTodo.id == |(
+                    SwifQL
+                        .select(\PTodo.id)
+                        .from(PTodo.table)
+                        .where(\PTodo.id == 1)
+                        .orderBy(.desc(\PTodo.title))
+                        .offset(0)
+                        .limit(1)
+                    )|
+                )
+
+            /* Produces
+
+             SELECT User.* , Todo.* FROM User LEFT JOIN Todo ON Todo.id = (SELECT Todo.id FROM Todo WHERE Todo.id = 1 ORDER BY Todo.title DESC LIMIT 1)
+
+             */
+
+            return query
+                .execute(on: connection)
+                .all(decoding: PUser.self, PTodo.self)
+                .map { result in
+                    return result.map { (user, todo) in PTodoUserResponse(todo: todo, user: user) }
+            }
+        }
+    }
 }
 
 struct TodosResponse: Content {
@@ -357,4 +445,9 @@ struct TodoTodoUserResponse: Content {
     let todo1: Todo
     let todo2: Todo
     let user: User
+}
+
+struct PTodoUserResponse: Content {
+    let todo: PTodo
+    let user: PUser
 }

@@ -1,7 +1,7 @@
-import FluentMySQL
+import FluentPostgreSQL
 import Vapor
 
-final class User: Codable {
+final class PUser: Codable {
     var id: Int?
     var name: String
 
@@ -11,13 +11,13 @@ final class User: Codable {
     }
 }
 
-extension User: MySQLModel { }
+extension PUser: PostgreSQLModel { }
 
 /// Allows `Todo` to be used as a dynamic migration.
-extension User: Migration { }
+extension PUser: Migration { }
 
 /// Allows `Todo` to be encoded to and decoded from HTTP messages.
-extension User: Content { }
+extension PUser: Content { }
 
 /// Allows `Todo` to be used as a dynamic parameter in route definitions.
-extension User: Parameter { }
+extension PUser: Parameter { }

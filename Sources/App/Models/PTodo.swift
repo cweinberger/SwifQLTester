@@ -1,7 +1,7 @@
-import FluentMySQL
+import FluentPostgreSQL
 import Vapor
 
-final class Todo: Codable {
+final class PTodo: Codable {
     var id: Int?
     var title: String
 
@@ -11,13 +11,13 @@ final class Todo: Codable {
     }
 }
 
-extension Todo: MySQLModel { }
+extension PTodo: PostgreSQLModel { }
 
 /// Allows `Todo` to be used as a dynamic migration.
-extension Todo: Migration { }
+extension PTodo: Migration { }
 
 /// Allows `Todo` to be encoded to and decoded from HTTP messages.
-extension Todo: Content { }
+extension PTodo: Content { }
 
 /// Allows `Todo` to be used as a dynamic parameter in route definitions.
-extension Todo: Parameter { }
+extension PTodo: Parameter { }
